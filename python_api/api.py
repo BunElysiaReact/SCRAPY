@@ -239,9 +239,15 @@ def scrape_url(url, selector, limit=50):
     except Exception as e:
         return {"error": f"Fetch failed: {e}"}
 
+    # Write HTML to a temp file — passing it as a CLI arg fails on large pages (E2BIG)
+    import tempfile
+    tmp = None
     try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as tf:
+            tf.write(html)
+            tmp = tf.name
         proc = subprocess.run(
-            [str(RUST_BIN), "--selector", selector, "--html", html, "--limit", str(limit)],
+            [str(RUST_BIN), "--selector", selector, "--file", tmp, "--limit", str(limit)],
             capture_output=True, text=True, timeout=15
         )
         if proc.returncode != 0 or not proc.stdout.strip():
@@ -250,6 +256,10 @@ def scrape_url(url, selector, limit=50):
         return {"url": url, "selector": selector, "count": len(matches), "matches": matches}
     except Exception as e:
         return {"error": f"rust_finder failed: {e}"}
+    finally:
+        if tmp:
+            try: os.unlink(tmp)
+            except: pass
 
 # ── Data queries ──────────────────────────────────────────────────────────────
 
