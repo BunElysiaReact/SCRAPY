@@ -1,9 +1,0 @@
-=== NATIVE HOST STARTED at 1771676872 ===
-[1771676872] Native host started
-[1771676872] Buffers disabled
-[1771676872] Waiting for message...
-[1771676872] RECV: {"command":"register","browser":"brave","timestamp":1771676872256}
-[1771676872] Browser registered successfully
-[1771676872] SENT: {"status":"registered","message":"Welcome from C!"}
-[1771676872] Waiting for message...
-[1771676872] INFO: stdin closed (browser disconnected)
