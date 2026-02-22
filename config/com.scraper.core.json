@@ -1,0 +1,9 @@
+{
+  "name": "com.scraper.core",
+  "description": "Scraper Core Native Host",
+  "path": "/home/YOUR_USERNAME/scraper/c_core/native_host/native_host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://YOUR_EXTENSION_ID_HERE/"
+  ]
+}

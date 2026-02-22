@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Scraper Core",
+  "version": "2.1.0",
+  "description": "Session-isolated stealth scraper with C backend",
+  "permissions": [
+    "nativeMessaging",
+    "webRequest",
+    "cookies",
+    "tabs",
+    "storage",
+    "scripting",
+    "debugger"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["stealth.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

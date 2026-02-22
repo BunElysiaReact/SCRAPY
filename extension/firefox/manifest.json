@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2,
+  "name": "Scraper Core",
+  "version": "1.0",
+  "description": "Scraper extension with native messaging",
+  
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "scraper-core@peaseernest.com",
+      "strict_min_version": "78.0"
+    }
+  },
+  
+  "permissions": [
+    "nativeMessaging",
+    "cookies",
+    "tabs",
+    "<all_urls>"
+  ],
+  
+  "background": {
+    "scripts": ["background.js"]
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

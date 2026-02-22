@@ -1,0 +1,7 @@
+{
+  "name": "com.scraper.core",
+  "description": "Scraper Core Native Host",
+  "path": "C:\\PATH\\TO\\scrapy-windows-x64\\c_core\\native_host\\debug_host.exe",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://YOUR_EXTENSION_ID_HERE/"]
+}

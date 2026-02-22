@@ -1,0 +1,7 @@
+/home/PeaseErnest/scraper/rust_finder/target/release/deps/phf_codegen-84ae97fc5ab4d6b7.d: /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/phf_codegen-0.11.3/src/lib.rs
+
+/home/PeaseErnest/scraper/rust_finder/target/release/deps/libphf_codegen-84ae97fc5ab4d6b7.rlib: /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/phf_codegen-0.11.3/src/lib.rs
+
+/home/PeaseErnest/scraper/rust_finder/target/release/deps/libphf_codegen-84ae97fc5ab4d6b7.rmeta: /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/phf_codegen-0.11.3/src/lib.rs
+
+/home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/phf_codegen-0.11.3/src/lib.rs:

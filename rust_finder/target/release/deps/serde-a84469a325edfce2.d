@@ -1,0 +1,14 @@
+/home/PeaseErnest/scraper/rust_finder/target/release/deps/serde-a84469a325edfce2.d: /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/PeaseErnest/scraper/rust_finder/target/release/build/serde-34f48f7d935fc3cc/out/private.rs
+
+/home/PeaseErnest/scraper/rust_finder/target/release/deps/libserde-a84469a325edfce2.rlib: /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/PeaseErnest/scraper/rust_finder/target/release/build/serde-34f48f7d935fc3cc/out/private.rs
+
+/home/PeaseErnest/scraper/rust_finder/target/release/deps/libserde-a84469a325edfce2.rmeta: /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/PeaseErnest/scraper/rust_finder/target/release/build/serde-34f48f7d935fc3cc/out/private.rs
+
+/home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/PeaseErnest/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/PeaseErnest/scraper/rust_finder/target/release/build/serde-34f48f7d935fc3cc/out/private.rs:
+
+# env-dep:OUT_DIR=/home/PeaseErnest/scraper/rust_finder/target/release/build/serde-34f48f7d935fc3cc/out
