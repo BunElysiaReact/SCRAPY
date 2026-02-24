@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrapy</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #07070c;
+  --bg2:     #0d0d16;
+  --bg3:     #111120;
+  --border:  #1c1c2e;
+  --border2: #252538;
+  --green:   #00ff88;
+  --cyan:    #00e5ff;
+  --yellow:  #ffe066;
+  --orange:  #ff9500;
+  --red:     #ff4560;
+  --purple:  #b388ff;
+  --text:    #d0d0e8;
+  --dim:     #505070;
+  --mid:     #8888aa;
+  --font:    'JetBrains Mono', 'Fira Code', monospace;
+}
+
+body {
+  width: 340px;
+  min-height: 440px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 11px;
+  /* scanline */
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,255,136,0.007) 2px, rgba(0,255,136,0.007) 4px
+  );
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 2px; }
+::-webkit-scrollbar-thumb { background: var(--border2); }
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 9px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 3px;
+}
+.version {
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: 1px;
+}
+.conn-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: background .3s;
+}
+.conn-dot.live  { background: var(--green); animation: pulse 2s infinite; }
+.conn-dot.dead  { background: var(--red); }
+
+/* ── Tab URL bar ── */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+.tab-icon {
+  font-size: 10px;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+.tab-url {
+  font-size: 9px;
+  color: var(--mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.tab-url.tracked { color: var(--green); }
+
+/* ── Track toggle ── */
+.track-section {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.track-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all .15s;
+  position: relative;
+  overflow: hidden;
+}
+.track-btn.off {
+  background: var(--green)18;
+  border: 1px solid var(--green)66;
+  color: var(--green);
+}
+.track-btn.off:hover {
+  background: var(--green)30;
+}
+.track-btn.on {
+  background: var(--red)18;
+  border: 1px solid var(--red)66;
+  color: var(--red);
+}
+.track-btn.on:hover {
+  background: var(--red)30;
+}
+.track-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.track-btn.off .track-dot { background: var(--green); }
+.track-btn.on  .track-dot { background: var(--red); animation: pulse 1.2s infinite; }
+.track-btn-label { flex: 1; text-align: left; }
+.track-req-count {
+  font-size: 9px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* ── Stats row ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.stat-cell {
+  padding: 8px 6px 7px;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+.stat-cell:last-child { border-right: none; }
+.stat-num {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 3px;
+  font-variant-numeric: tabular-nums;
+  transition: color .3s;
+}
+.stat-label {
+  font-size: 7px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ── Quick actions ── */
+.actions-head {
+  padding: 8px 12px 5px;
+  font-size: 8px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--mid);
+  transition: all .12s;
+  text-align: left;
+}
+.action-btn:hover:not(:disabled) {
+  background: var(--bg3);
+  border-color: var(--border2);
+  color: var(--text);
+}
+.action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.action-btn .icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.action-btn.success { border-color: var(--green)44; color: var(--green); }
+.action-btn.loading { border-color: var(--cyan)44; color: var(--cyan); }
+
+/* ── Live feed ── */
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px 4px;
+  font-size: 8px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border-top: 1px solid var(--border);
+}
+.feed-count {
+  font-size: 8px;
+  color: var(--mid);
+  margin-left: auto;
+}
+.feed-list {
+  max-height: 130px;
+  overflow-y: auto;
+  padding: 0 0 6px;
+}
+.feed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px;
+  font-size: 9px;
+  border-bottom: 1px solid var(--bg2);
+  transition: background .08s;
+}
+.feed-row:hover { background: var(--bg2); }
+.feed-type {
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  min-width: 38px;
+  text-align: center;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.feed-url {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mid);
+}
+.feed-time {
+  font-size: 8px;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+
+/* ── Footer ── */
+.footer {
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.footer-link {
+  font-size: 9px;
+  color: var(--dim);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  padding: 0;
+  transition: color .1s;
+}
+.footer-link:hover { color: var(--green); }
+.footer-sep { color: var(--border2); }
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 44px; left: 10px; right: 10px;
+  padding: 7px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  z-index: 99;
+  animation: slide-up .15s ease;
+}
+.toast.ok  { background: var(--green)18; border: 1px solid var(--green)44; color: var(--green); }
+.toast.err { background: var(--red)18;   border: 1px solid var(--red)44;   color: var(--red); }
+
+/* ── Not connected banner ── */
+.no-conn {
+  margin: 10px 12px;
+  padding: 10px 12px;
+  background: var(--red)0d;
+  border: 1px solid var(--red)33;
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--red);
+  line-height: 1.7;
+}
+
+/* ── Animations ── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes count-bump {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.bump { animation: count-bump 0.25s ease; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <span class="logo">◈ SCRAPY</span>
+  <span class="version">v2.1</span>
+  <div class="conn-dot dead" id="connDot"></div>
+</div>
+
+<!-- Current tab URL -->
+<div class="tab-bar">
+  <span class="tab-icon">⬡</span>
+  <span class="tab-url" id="tabUrl">loading...</span>
+</div>
+
+<!-- Native host not connected notice (hidden by default) -->
+<div class="no-conn" id="noConn" style="display:none">
+  ⚠ Native host not connected.<br>
+  Make sure <code>debug_host</code> is running and the extension ID in the manifest matches.
+</div>
+
+<!-- Track toggle -->
+<div class="track-section">
+  <button class="track-btn off" id="trackBtn" onclick="toggleTrack()">
+    <div class="track-dot"></div>
+    <span class="track-btn-label" id="trackLabel">Track This Tab</span>
+    <span class="track-req-count" id="reqCount"></span>
+  </button>
+</div>
+
+<!-- Stats -->
+<div class="stats-row" id="statsRow">
+  <div class="stat-cell">
+    <div class="stat-num" id="statReqs" style="color: #00ff88">0</div>
+    <div class="stat-label">Requests</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-num" id="statTokens" style="color: #ffe066">0</div>
+    <div class="stat-label">Tokens</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-num" id="statCookies" style="color: #ff9500">0</div>
+    <div class="stat-label">Auth Cook.</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-num" id="statWS" style="color: #b388ff">0</div>
+    <div class="stat-label">WS Frames</div>
+  </div>
+</div>
+
+<!-- Quick actions -->
+<div class="actions-head">Quick Capture</div>
+<div class="actions-grid" id="actionsGrid">
+  <button class="action-btn" id="btn-dom" onclick="doAction('dom')">
+    <span class="icon">⊞</span><span>DOM Snapshot</span>
+  </button>
+  <button class="action-btn" id="btn-screenshot" onclick="doAction('screenshot')">
+    <span class="icon">⬜</span><span>Screenshot</span>
+  </button>
+  <button class="action-btn" id="btn-html" onclick="doAction('html')">
+    <span class="icon">⌨</span><span>Save HTML</span>
+  </button>
+  <button class="action-btn" id="btn-cookies" onclick="doAction('cookies')">
+    <span class="icon">◈</span><span>Dump Cookies</span>
+  </button>
+  <button class="action-btn" id="btn-storage" onclick="doAction('storage')">
+    <span class="icon">⊟</span><span>Dump Storage</span>
+  </button>
+  <button class="action-btn" id="btn-dashboard" onclick="openDashboard()">
+    <span class="icon">⟶</span><span>Dashboard</span>
+  </button>
+</div>
+
+<!-- Live feed -->
+<div class="feed-head">
+  Live Feed
+  <span class="feed-count" id="feedCount">0 events</span>
+</div>
+<div class="feed-list" id="feedList"></div>
+
+<!-- Footer -->
+<div class="footer">
+  <button class="footer-link" onclick="clearTabData()">Clear Tab Data</button>
+  <span class="footer-sep">·</span>
+  <button class="footer-link" onclick="openDashboard()">Open Dashboard</button>
+  <span style="margin-left:auto; font-size:8px; color: var(--dim)" id="footerDomain"></span>
+</div>
+
+<!-- Toast container -->
+<div id="toast" class="toast ok" style="display:none"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>
