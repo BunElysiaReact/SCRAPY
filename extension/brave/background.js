@@ -1,4 +1,4 @@
-// background.js - SESSION ISOLATED SCRAPER v3.1 (with popup support + DOM mapping)
+// background.js - SESSION ISOLATED SCRAPER v3.2 (FIXED)
 const BROWSER = 'brave';
 let nativePort = null;
 let reconnectAttempts = 0;
@@ -10,14 +10,13 @@ const siteContexts    = new Map();
 const tabContexts     = new Map();
 
 // ── Per-tab stats (for popup) ─────────────────────────────────────────────────
-// tabStats[tabId] = { requests, tokens, authCookies, websockets, events[] }
 const tabStats = new Map();
 
 function getTabStats(tabId) {
   if (!tabStats.has(tabId)) {
     tabStats.set(tabId, {
       requests: 0, tokens: 0, authCookies: 0, websockets: 0,
-      events: []   // last 100 events for live feed
+      events: []
     });
   }
   return tabStats.get(tabId);
@@ -26,22 +25,15 @@ function getTabStats(tabId) {
 function recordTabEvent(tabId, event) {
   if (!tabId) return;
   const s = getTabStats(tabId);
-  if (event.type === "request")    s.requests++;
+  if (event.type === "request")     s.requests++;
   if (event.type === "auth_cookie") s.authCookies++;
-  if (event.type === "websocket")  s.websockets++;
+  if (event.type === "websocket")   s.websockets++;
   if (event.type === "response_body") {
-    // count bearer tokens in body headers
     const auth = event.reqHeaders?.authorization || event.reqHeaders?.Authorization || "";
     if (auth.toLowerCase().startsWith("bearer ")) s.tokens++;
   }
-  // prepend to events feed, keep last 100
   s.events.unshift({ ...event, _tabId: tabId });
   if (s.events.length > 100) s.events.length = 100;
-}
-
-// ── Resolve active tabId from a CDP source ────────────────────────────────────
-function resolveTabId(source) {
-  return source?.tabId ?? null;
 }
 
 console.log('🦁 Scraper Starting...');
@@ -56,6 +48,101 @@ function send(obj) {
 function getDomain(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); }
   catch { return 'unknown'; }
+}
+
+
+// ── Task / Session Token Scanner ─────────────────────────────────────────────
+const TOKEN_REGEXES = [
+  /"(task|taskId|task_id|jobId|job_id|sessionToken|session_token|nonce|_token|csrf[a-zA-Z_]*|xsrf[a-zA-Z_]*|upload_?[Tt]oken|api_?[Tt]oken|requestToken|auth_?[Tt]oken)"\s*:\s*"([a-zA-Z0-9_\-\.]{8,512})"/g,
+  /\b(task|taskId|task_id|jobId|sessionToken|nonce|csrfToken|csrf_token|xsrfToken|uploadToken|apiToken|_token)\s*[=:]\s*["']([a-zA-Z0-9_\-\.]{8,512})["']/g,
+  /data-(?:task|job|token|csrf|nonce|session)[a-zA-Z0-9\-]*=["']([a-zA-Z0-9_\-\.]{8,512})["']/gi,
+];
+
+function extractTokensFromText(text, sourceUrl) {
+  if (!text || text.length < 10) return [];
+  const found = [], seen = new Set();
+  for (const re of TOKEN_REGEXES) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const name  = m[2] ? m[1] : 'token';
+      const value = m[2] || m[1];
+      const key   = name.toLowerCase() + ':' + value;
+      if (!seen.has(key) && value.length >= 8) {
+        seen.add(key);
+        found.push({ name: name.toLowerCase(), value, source: sourceUrl });
+      }
+    }
+  }
+  return found;
+}
+
+function scanBodyForTokens(bodyText, url, domain, tabId) {
+  const tokens = extractTokensFromText(bodyText, url);
+  if (!tokens.length) return;
+  const evt = { type: 'task_tokens', domain, url, tokens, timestamp: Date.now(), tabId };
+  send(evt);
+  recordTabEvent(tabId, evt);
+}
+
+function extractPageGlobals(tabId, domain, pageUrl) {
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const results = [], seen = new Set();
+      const add = (name, value, src) => {
+        if (!value || typeof value !== 'string' || value.length < 8) return;
+        const k = name + ':' + value;
+        if (seen.has(k)) return;
+        seen.add(k);
+        results.push({ name, value, source: src || 'window_global' });
+      };
+      const GLOBAL_NAMES = ['task','taskId','task_id','jobId','job_id','nonce',
+        'csrfToken','csrf_token','_token','xsrfToken','uploadToken','apiToken',
+        'sessionToken','ILovePDF','App','__INITIAL_STATE__','__CONFIG__','bootstrap'];
+      for (const g of GLOBAL_NAMES) {
+        try {
+          const v = window[g];
+          if (typeof v === 'string') { add(g, v, 'window.' + g); continue; }
+          if (v && typeof v === 'object') {
+            for (const k of Object.keys(v).slice(0, 50)) {
+              if (/task|token|csrf|nonce|job|session|auth|key|secret/i.test(k))
+                add(g + '.' + k, String(v[k] ?? ''), 'window.' + g + '.' + k);
+            }
+          }
+        } catch {}
+      }
+      const scriptREs = [
+        /"(task|taskId|task_id|jobId|sessionToken|nonce|_token|csrfToken|xsrfToken|uploadToken)"\s*:\s*"([a-zA-Z0-9_\-\.]{8,512})"/g,
+        /\b(task|taskId|job_?[Ii]d|sessionToken|csrfToken|nonce|uploadToken|apiToken)\s*[=:]\s*["']([a-zA-Z0-9_\-\.]{8,512})["']/g,
+      ];
+      document.querySelectorAll('script:not([src])').forEach(s => {
+        const t = s.textContent || '';
+        for (const re of scriptREs) {
+          re.lastIndex = 0; let m;
+          while ((m = re.exec(t)) !== null) add(m[1], m[2], 'inline_script');
+        }
+      });
+      document.querySelectorAll('meta').forEach(el => {
+        const name = el.getAttribute('name') || el.getAttribute('property') || '';
+        const val  = el.getAttribute('content') || '';
+        if (/token|csrf|nonce|task|auth/i.test(name) && val) add(name, val, 'meta:' + name);
+      });
+      ['task','job','token','csrf','nonce','session'].forEach(attr => {
+        const bv = document.body?.dataset?.[attr];
+        const hv = document.documentElement?.dataset?.[attr];
+        if (bv) add('body-data-' + attr, bv, 'data-' + attr);
+        if (hv) add('html-data-' + attr, hv, 'data-' + attr);
+      });
+      return results;
+    }
+  }, (results) => {
+    if (chrome.runtime.lastError || !results?.[0]?.result?.length) return;
+    const tokens = results[0].result;
+    const evt = { type: 'task_tokens', domain, url: pageUrl, tokens, source: 'page_globals', timestamp: Date.now(), tabId };
+    send(evt);
+    recordTabEvent(tabId, evt);
+  });
 }
 
 // ── DOM Map ───────────────────────────────────────────────────────────────────
@@ -89,26 +176,92 @@ function mapDOM(tabId, domain) {
   });
 }
 
-// ── Session context per domain ────────────────────────────────────────────────
-async function getOrCreateContext(domain) {
-  if (siteContexts.has(domain)) return siteContexts.get(domain);
-  try {
-    const ctx = await chrome.contextualIdentities.create({
-      name: `scraper:${domain}`, color: 'blue', icon: 'circle'
-    });
-    siteContexts.set(domain, ctx.cookieStoreId);
-    return ctx.cookieStoreId;
-  } catch { return null; }
+// ── Fingerprint capture ───────────────────────────────────────────────────────
+function captureFingerprint(tabId) {
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      let webglVendor = '', webglRenderer = '';
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (gl) {
+          const ext = gl.getExtension('WEBGL_debug_renderer_info');
+          if (ext) {
+            webglVendor   = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
+            webglRenderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+          }
+        }
+      } catch (_) {}
+      let audioSampleRate = null;
+      try {
+        const actx = new (window.AudioContext || window.webkitAudioContext)();
+        audioSampleRate = actx.sampleRate;
+        actx.close();
+      } catch (_) {}
+      return {
+        userAgent:           navigator.userAgent,
+        language:            navigator.language,
+        languages:           Array.from(navigator.languages || []),
+        platform:            navigator.platform,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        deviceMemory:        navigator.deviceMemory ?? null,
+        cookieEnabled:       navigator.cookieEnabled,
+        doNotTrack:          navigator.doNotTrack,
+        vendor:              navigator.vendor,
+        maxTouchPoints:      navigator.maxTouchPoints,
+        screen: {
+          width:       screen.width,
+          height:      screen.height,
+          availWidth:  screen.availWidth,
+          availHeight: screen.availHeight,
+          colorDepth:  screen.colorDepth,
+          pixelDepth:  screen.pixelDepth,
+        },
+        devicePixelRatio: window.devicePixelRatio,
+        timezone:         Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezoneOffset:   new Date().getTimezoneOffset(),
+        webgl:            { vendor: webglVendor, renderer: webglRenderer },
+        audioSampleRate,
+        connection:       navigator.connection ? {
+          effectiveType: navigator.connection.effectiveType,
+          downlink:      navigator.connection.downlink,
+          rtt:           navigator.connection.rtt,
+        } : null,
+        acceptHeaders: {
+          accept:         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          acceptLanguage: (navigator.languages || [navigator.language]).join(','),
+          acceptEncoding: 'gzip, deflate, br',
+        },
+      };
+    }
+  }, (results) => {
+    if (chrome.runtime.lastError || !results?.[0]?.result) {
+      console.log('Fingerprint capture error:', chrome.runtime.lastError?.message);
+      return;
+    }
+    const domain = tabContexts.get(tabId) || 'unknown';
+    const evt = {
+      type:        'fingerprint',
+      domain,
+      tabId,
+      fingerprint: results[0].result,
+      timestamp:   Date.now(),
+    };
+    send(evt);
+    recordTabEvent(tabId, evt);
+    console.log(`🖥️ Fingerprint captured for ${domain}`);
+  });
 }
 
-// ── Navigate + track ──────────────────────────────────────────────────────────
-async function navigateAndTrack(url) {
+// ── Navigate + Track ──────────────────────────────────────────────────────────
+function navigateAndTrack(url) {
   const domain = getDomain(url);
-  let cookieStoreId;
-  try { cookieStoreId = await getOrCreateContext(domain); } catch { cookieStoreId = null; }
-  const props = { url, active: true };
-  if (cookieStoreId) props.cookieStoreId = cookieStoreId;
-  chrome.tabs.create(props, (tab) => {
+  chrome.tabs.create({ url, active: true }, (tab) => {
+    if (chrome.runtime.lastError) {
+      console.error('tabs.create failed:', chrome.runtime.lastError.message);
+      return;
+    }
     tabContexts.set(tab.id, domain);
     const listener = (tabId, info) => {
       if (tabId !== tab.id) return;
@@ -119,6 +272,7 @@ async function navigateAndTrack(url) {
     };
     chrome.tabs.onUpdated.addListener(listener);
     send({ type: 'nav_started', url, domain, tabId: tab.id, timestamp: Date.now() });
+    console.log('🚀 Navigating to', url, 'tab:', tab.id);
   });
 }
 
@@ -139,6 +293,7 @@ function attachDebugger(tabId) {
     chrome.debugger.sendCommand({ tabId }, 'Fetch.enable', {
       patterns: [{ urlPattern: '*', requestStage: 'Response' }]
     });
+    console.log('🔬 Debugger attached to tab', tabId);
   });
 }
 
@@ -152,11 +307,15 @@ function detachDebugger(tabId) {
   });
 }
 
-// ── Auto DOM map on page load ─────────────────────────────────────────────────
+// ── Auto DOM map + fingerprint on page load ───────────────────────────────────
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   if (info.status === 'complete' && debuggedTabs.has(tabId)) {
     const domain = tabContexts.get(tabId) || getDomain(tab.url || '');
+    tabContexts.set(tabId, domain);
     setTimeout(() => mapDOM(tabId, domain), 1500);
+    setTimeout(() => extractPageGlobals(tabId, domain, tab.url || ''), 2000);
+    setTimeout(() => captureFingerprint(tabId), 2500);
+    console.log('📄 Page loaded, capturing fingerprint for', domain);
   }
 });
 
@@ -227,6 +386,9 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
             };
             send(evt);
             recordTabEvent(tabId, evt);
+            if (!body.base64Encoded && body.body && (isJson || isHtml)) {
+              scanBodyForTokens(body.body, req.url, domain, tabId);
+            }
           }
           chrome.debugger.sendCommand({ tabId }, 'Fetch.continueRequest',
             { requestId: params.requestId });
@@ -303,7 +465,6 @@ chrome.cookies.onChanged.addListener((changeInfo) => {
       cause: changeInfo.cause, removed: changeInfo.removed, timestamp: Date.now()
     };
     send(evt);
-    // record on whatever tab is active for this domain
     debuggedTabs.forEach(tabId => {
       if (tabContexts.get(tabId) === domain) recordTabEvent(tabId, evt);
     });
@@ -320,16 +481,97 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (debuggedTabs.has(tabId)) debuggedTabs.delete(tabId);
   tabContexts.delete(tabId);
   pendingRequests.forEach((v, k) => { if (v.tabId === tabId) pendingRequests.delete(k); });
-  // Keep tabStats for a bit so popup can still show final counts
   setTimeout(() => tabStats.delete(tabId), 60000);
 });
+
+// ── Commands from native host ─────────────────────────────────────────────────
+function handleNativeCommand(msg) {
+  const { command } = msg;
+  console.log('📨 Native command:', command);
+
+  if (command === 'navigate' || command === 'nav') {
+    const url = msg.url || msg.args || '';
+    console.log('🚀 Navigate to:', url);
+    navigateAndTrack(url);
+  }
+  else if (command === 'track') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        tabContexts.set(tabs[0].id, getDomain(tabs[0].url));
+        attachDebugger(tabs[0].id);
+        console.log('🔬 Tracking tab:', tabs[0].id, tabs[0].url);
+      }
+    });
+  }
+  else if (command === 'untrack') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) detachDebugger(tabs[0].id);
+    });
+  }
+  else if (command === 'fingerprint') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        const domain = tabContexts.get(tabs[0].id) || getDomain(tabs[0].url || '');
+        tabContexts.set(tabs[0].id, domain);
+        captureFingerprint(tabs[0].id);
+        console.log('🖥️ Manual fingerprint capture for tab:', tabs[0].id);
+      }
+    });
+  }
+  else if (command === 'get_cookies') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) return;
+      chrome.cookies.getAll({ url: tabs[0].url }, (cookies) => {
+        send({ type: 'cookies', domain: getDomain(tabs[0].url), cookies, url: tabs[0].url, timestamp: Date.now() });
+      });
+    });
+  }
+  else if (command === 'get_storage') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) return;
+      chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id },
+        func: () => ({ localStorage: { ...localStorage }, sessionStorage: { ...sessionStorage }, url: window.location.href })
+      }, (r) => {
+        if (r?.[0]) send({ type: 'storage', domain: getDomain(tabs[0].url), data: r[0].result, timestamp: Date.now() });
+      });
+    });
+  }
+  else if (command === 'get_html') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) return;
+      chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id },
+        func: () => ({ html: document.documentElement.outerHTML, title: document.title, url: window.location.href })
+      }, (r) => {
+        if (r?.[0]) send({ type: 'html', domain: getDomain(tabs[0].url), data: r[0].result, timestamp: Date.now() });
+      });
+    });
+  }
+  else if (command === 'screenshot') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) return;
+      chrome.tabs.captureVisibleTab(tabs[0].windowId, { format: 'png' }, (dataUrl) => {
+        send({ type: 'screenshot', domain: getDomain(tabs[0].url), dataUrl, url: tabs[0].url, timestamp: Date.now() });
+      });
+    });
+  }
+  else if (command === 'dommap') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        const domain = tabContexts.get(tabs[0].id) || getDomain(tabs[0].url);
+        mapDOM(tabs[0].id, domain);
+      }
+    });
+  }
+}
 
 // ── Popup message handlers ────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const { command, tabId, action } = msg;
 
   if (command === 'popup_get_state') {
-    const stats    = getTabStats(tabId);
+    const stats      = getTabStats(tabId);
     const isTracking = debuggedTabs.has(tabId);
     sendResponse({
       nativeConnected: !!nativePort,
@@ -347,11 +589,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (command === 'popup_track') {
-    if (!nativePort) { sendResponse({ success: false }); return true; }
     chrome.tabs.get(tabId, (tab) => {
       if (chrome.runtime.lastError || !tab) { sendResponse({ success: false }); return; }
       tabContexts.set(tabId, getDomain(tab.url || ''));
       attachDebugger(tabId);
+      // Capture fingerprint immediately when tracking starts
+      setTimeout(() => captureFingerprint(tabId), 1000);
       sendResponse({ success: true });
     });
     return true;
@@ -364,14 +607,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (command === 'popup_action') {
-    if (!nativePort) { sendResponse({ success: false }); return true; }
-
     chrome.tabs.get(tabId, (tab) => {
       if (chrome.runtime.lastError || !tab) { sendResponse({ success: false }); return; }
       const domain = tabContexts.get(tabId) || getDomain(tab.url || '');
 
       if (action === 'dommap') {
         mapDOM(tabId, domain);
+        sendResponse({ success: true });
+
+      } else if (action === 'fingerprint') {
+        captureFingerprint(tabId);
         sendResponse({ success: true });
 
       } else if (action === 'screenshot') {
@@ -419,7 +664,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ success: false });
       }
     });
-    return true; // async
+    return true;
   }
 
   if (command === 'popup_clear_tab') {
@@ -428,67 +673,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  // ── Legacy commands from dashboard/CLI ──────────────────────────────────────
   if (command === 'navigate') { navigateAndTrack(msg.url); }
-  if (command === 'track') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        tabContexts.set(tabs[0].id, getDomain(tabs[0].url));
-        attachDebugger(tabs[0].id);
-      }
-    });
-  }
-  if (command === 'untrack') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) detachDebugger(tabs[0].id);
-    });
-  }
-  if (command === 'dommap') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        const domain = tabContexts.get(tabs[0].id) || getDomain(tabs[0].url);
-        mapDOM(tabs[0].id, domain);
-      }
-    });
-  }
-  if (command === 'get_cookies') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) return;
-      chrome.cookies.getAll({ url: tabs[0].url }, (cookies) => {
-        send({ type: 'cookies', domain: getDomain(tabs[0].url), cookies, url: tabs[0].url, timestamp: Date.now() });
-      });
-    });
-  }
-  if (command === 'get_storage') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) return;
-      chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
-        func: () => ({ localStorage: { ...localStorage }, sessionStorage: { ...sessionStorage }, url: window.location.href })
-      }, (r) => {
-        if (r?.[0]) send({ type: 'storage', domain: getDomain(tabs[0].url), data: r[0].result, timestamp: Date.now() });
-      });
-    });
-  }
-  if (command === 'get_html') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) return;
-      chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
-        func: () => ({ html: document.documentElement.outerHTML, title: document.title, url: window.location.href })
-      }, (r) => {
-        if (r?.[0]) send({ type: 'html', domain: getDomain(tabs[0].url), data: r[0].result, timestamp: Date.now() });
-      });
-    });
-  }
-  if (command === 'screenshot') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) return;
-      chrome.tabs.captureVisibleTab(tabs[0].windowId, { format: 'png' }, (dataUrl) => {
-        send({ type: 'screenshot', domain: getDomain(tabs[0].url), dataUrl, url: tabs[0].url, timestamp: Date.now() });
-      });
-    });
-  }
   if (command === 'ping') { /* keepalive */ }
 });
 
@@ -498,11 +683,15 @@ function connectToNative() {
     nativePort = chrome.runtime.connectNative('com.scraper.core');
 
     nativePort.onMessage.addListener((msg) => {
+      if (!msg) return;
       reconnectAttempts = 0;
-      // Route native messages to the appropriate handler
-      if (msg.command) {
-        chrome.runtime.sendMessage(msg).catch(() => {});
+      console.log('📩 From native:', JSON.stringify(msg).slice(0, 100));
+
+      if (msg.command && msg.command !== 'pong') {
+        handleNativeCommand(msg);
       }
+
+      chrome.runtime.sendMessage(msg).catch(() => {});
     });
 
     nativePort.onDisconnect.addListener(() => {

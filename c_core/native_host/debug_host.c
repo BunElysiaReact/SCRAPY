@@ -18,6 +18,8 @@
 #define COOKIES_FILE   "/home/PeaseErnest/scraper/data/cookies.jsonl"
 #define WS_FILE        "/home/PeaseErnest/scraper/data/websockets.jsonl"
 #define DOMMAP_FILE    "/home/PeaseErnest/scraper/data/dommaps.jsonl"
+#define STORAGE_FILE   "/home/PeaseErnest/scraper/data/storage.jsonl"
+#define FINGERPRINT_FILE "/home/PeaseErnest/scraper/data/fingerprints.jsonl"
 #define SOCKET_PATH    "/tmp/scraper.sock"
 #define MAX_MSG        (5 * 1024 * 1024)
 #define MAX_CLIENTS    4
@@ -104,7 +106,6 @@ char *receive_message() {
     return buf;
 }
 
-// Extract a string field value from JSON (simple, no lib needed)
 void json_get_str(const char *json, const char *key, char *out, size_t outlen) {
     char search[128];
     snprintf(search, sizeof(search), "\"%s\":\"", key);
@@ -162,7 +163,6 @@ void route_message(const char *msg) {
     }
     else if (strcmp(type, "cookies_changed") == 0) {
         save_to_file(COOKIES_FILE, msg);
-        // no CLI spam
     }
     else if (strcmp(type, "websocket") == 0) {
         save_to_file(WS_FILE, msg);
@@ -176,8 +176,14 @@ void route_message(const char *msg) {
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "storage") == 0) {
-        save_to_file(AUTH_FILE, msg);
-        broadcast_to_cli("💾 STORAGE SAVED (auth.jsonl) — check for tokens!");
+        save_to_file(STORAGE_FILE, msg);
+        broadcast_to_cli("💾 STORAGE SAVED → storage.jsonl");
+    }
+    else if (strcmp(type, "fingerprint") == 0) {
+        save_to_file(FINGERPRINT_FILE, msg);
+        char dom[128]; json_get_str(msg, "domain", dom, sizeof(dom));
+        char line[300]; snprintf(line, sizeof(line), "🖥️  FINGERPRINT captured @ %s", dom);
+        broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "html") == 0) {
         char path[256];
@@ -199,7 +205,7 @@ void route_message(const char *msg) {
         broadcast_to_cli(line); write_log(line);
     }
     else {
-        char log[256]; snprintf(log, sizeof(log), "UNKNOWN: %.200s", msg);
+        char log[256]; snprintf(log, sizeof(log), "UNKNOWN type: %.200s", msg);
         write_log(log);
     }
 }
@@ -219,19 +225,25 @@ void handle_browser_message(const char *msg) {
     route_message(msg);
 }
 
+// ── CLI thread — handles text commands from api.py / scraper_cli ─────────────
+// FIX: Added "navigate <url>" alias, "fingerprint" command
+// api.py sends:  "navigate https://...\n"  or  "nav https://...\n"
 void *cli_client_thread(void *arg) {
     int fd = *(int *)arg; free(arg);
     const char *banner =
         "\n=== Scraper CLI ===\n"
-        "  nav <url>   - Open + track all requests\n"
-        "  track       - Track active tab\n"
-        "  untrack     - Stop tracking\n"
-        "  cookies     - Dump cookies\n"
-        "  storage     - Dump localStorage/sessionStorage\n"
-        "  html        - Get page HTML\n"
-        "  screenshot  - Capture screenshot\n"
-        "  files       - Show data files\n"
-        "  quit        - Exit\n> ";
+        "  nav <url>       - Open + track all requests\n"
+        "  navigate <url>  - Same as nav\n"
+        "  track           - Track active tab\n"
+        "  untrack         - Stop tracking\n"
+        "  cookies         - Dump cookies\n"
+        "  storage         - Dump localStorage/sessionStorage\n"
+        "  html            - Get page HTML\n"
+        "  screenshot      - Capture screenshot\n"
+        "  fingerprint     - Capture browser fingerprint\n"
+        "  dommap          - Map DOM\n"
+        "  files           - Show data files\n"
+        "  quit            - Exit\n> ";
     send(fd, banner, strlen(banner), MSG_NOSIGNAL);
 
     char line[512]; int pos = 0;
@@ -243,45 +255,84 @@ void *cli_client_thread(void *arg) {
             line[pos] = '\0'; pos = 0;
             char cmd[600] = {0}, reply[512] = {0};
 
+            // "nav <url>" OR "navigate <url>" — both open a new tab
             if (strncmp(line, "nav ", 4) == 0) {
-                snprintf(cmd, sizeof(cmd), "{\"command\":\"navigate\",\"url\":\"%s\"}", line+4);
+                snprintf(cmd, sizeof(cmd), "{\"command\":\"navigate\",\"url\":\"%s\"}", line + 4);
                 send_message(cmd);
-                snprintf(reply, sizeof(reply), "Navigating to %s\n> ", line+4);
+                char logbuf[300]; snprintf(logbuf, sizeof(logbuf), "NAV: %s", line + 4);
+                write_log(logbuf);
+                snprintf(reply, sizeof(reply), "Navigating to %s\n> ", line + 4);
+
+            } else if (strncmp(line, "navigate ", 9) == 0) {
+                snprintf(cmd, sizeof(cmd), "{\"command\":\"navigate\",\"url\":\"%s\"}", line + 9);
+                send_message(cmd);
+                char logbuf[300]; snprintf(logbuf, sizeof(logbuf), "NAVIGATE: %s", line + 9);
+                write_log(logbuf);
+                snprintf(reply, sizeof(reply), "Navigating to %s\n> ", line + 9);
+
             } else if (strcmp(line, "track") == 0) {
                 send_message("{\"command\":\"track\"}");
+                write_log("CMD: track");
                 snprintf(reply, sizeof(reply), "Tracking active tab\n> ");
+
             } else if (strcmp(line, "untrack") == 0) {
                 send_message("{\"command\":\"untrack\"}");
+                write_log("CMD: untrack");
                 snprintf(reply, sizeof(reply), "Stopped tracking\n> ");
+
             } else if (strcmp(line, "cookies") == 0) {
-                send_message("{\"command\":\"get_cookies\",\"url\":\"current\"}");
+                send_message("{\"command\":\"get_cookies\"}");
+                write_log("CMD: get_cookies");
                 snprintf(reply, sizeof(reply), "Fetching cookies...\n> ");
+
             } else if (strcmp(line, "storage") == 0) {
                 send_message("{\"command\":\"get_storage\"}");
+                write_log("CMD: get_storage");
                 snprintf(reply, sizeof(reply), "Fetching storage...\n> ");
+
             } else if (strcmp(line, "html") == 0) {
                 send_message("{\"command\":\"get_html\"}");
+                write_log("CMD: get_html");
                 snprintf(reply, sizeof(reply), "Fetching HTML...\n> ");
+
+            } else if (strcmp(line, "fingerprint") == 0) {
+                send_message("{\"command\":\"fingerprint\"}");
+                write_log("CMD: fingerprint");
+                snprintf(reply, sizeof(reply), "Capturing fingerprint...\n> ");
+
+            } else if (strcmp(line, "dommap") == 0) {
+                send_message("{\"command\":\"dommap\"}");
+                write_log("CMD: dommap");
+                snprintf(reply, sizeof(reply), "Mapping DOM...\n> ");
+
             } else if (strcmp(line, "screenshot") == 0) {
                 send_message("{\"command\":\"screenshot\"}");
+                write_log("CMD: screenshot");
                 snprintf(reply, sizeof(reply), "Taking screenshot...\n> ");
+
             } else if (strcmp(line, "files") == 0) {
                 char out[1024];
                 snprintf(out, sizeof(out),
                     "Data in %s:\n"
-                    "  requests.jsonl   - Flagged requests (auth, API, POST)\n"
-                    "  responses.jsonl  - Flagged responses\n"
-                    "  bodies.jsonl     - API response bodies\n"
-                    "  auth.jsonl       - Auth cookies + localStorage\n"
-                    "  cookies.jsonl    - All cookies\n"
-                    "  websockets.jsonl - WebSocket frames\n"
-                    "  html_*.json      - Saved HTML\n> ", DATA_DIR);
+                    "  requests.jsonl     - Flagged requests\n"
+                    "  responses.jsonl    - Flagged responses\n"
+                    "  bodies.jsonl       - API response bodies\n"
+                    "  auth.jsonl         - Auth cookies\n"
+                    "  cookies.jsonl      - All cookies\n"
+                    "  websockets.jsonl   - WebSocket frames\n"
+                    "  fingerprints.jsonl - Browser fingerprints\n"
+                    "  html_*.json        - Saved HTML\n> ", DATA_DIR);
                 send(fd, out, strlen(out), MSG_NOSIGNAL); continue;
+
             } else if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0) {
                 send(fd, "Bye\n", 4, MSG_NOSIGNAL); break;
+
             } else {
-                snprintf(reply, sizeof(reply), "Unknown command\n> ");
+                char logbuf[300]; snprintf(logbuf, sizeof(logbuf), "UNKNOWN CMD: %s", line);
+                write_log(logbuf);
+                snprintf(reply, sizeof(reply), "Unknown command: %s\n> ", line);
             }
+
             if (strlen(reply)) send(fd, reply, strlen(reply), MSG_NOSIGNAL);
         } else {
             if (pos < (int)sizeof(line) - 1) line[pos++] = c;
