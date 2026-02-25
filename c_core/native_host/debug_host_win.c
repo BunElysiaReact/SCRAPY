@@ -1,5 +1,4 @@
-// debug_host_win.c - SCRAPY native host for Windows
-// Uses Windows named pipes instead of Unix domain sockets
+// debug_host_win.c - FULL SCRAPER HOST FOR WINDOWS
 // Compile: x86_64-w64-mingw32-gcc -o debug_host.exe debug_host_win.c -lpthread -lws2_32 -D_WIN32_WINNT=0x0600
 
 #include <stdio.h>
@@ -32,6 +31,12 @@ static CRITICAL_SECTION cli_cs;
 static HANDLE cli_pipes[MAX_CLIENTS];
 static int    cli_count = 0;
 
+// Helper for Unicode/emoji in console (Windows)
+void write_utf8_to_console(HANDLE hConsole, const char *utf8str) {
+    DWORD written;
+    WriteFile(hConsole, utf8str, (DWORD)strlen(utf8str), &written, NULL);
+}
+
 // ── Logging ──────────────────────────────────────────────────
 void write_log(const char *msg) {
     FILE *f = fopen(LOG_FILE, "a");
@@ -54,7 +59,7 @@ void broadcast_to_cli(const char *line) {
     DWORD written;
     for (int i = 0; i < cli_count; i++) {
         WriteFile(cli_pipes[i], line, (DWORD)strlen(line), &written, NULL);
-        WriteFile(cli_pipes[i], "\n", 1, &written, NULL);
+        WriteFile(cli_pipes[i], "\r\n", 2, &written, NULL);
     }
     LeaveCriticalSection(&cli_cs);
 }
@@ -127,6 +132,23 @@ void json_get_str(const char *json, const char *key, char *out, size_t outlen) {
     out[i] = '\0';
 }
 
+// ── Extract flags array for requests ─────────────────────────
+void extract_flags(const char *json, char *out, size_t outlen) {
+    const char *fp = strstr(json, "\"flags\":[");
+    if (fp) {
+        const char *end = strchr(fp, ']');
+        if (end && (end - fp) < (int)outlen - 1) {
+            size_t len = end - fp + 1;
+            strncpy(out, fp, len);
+            out[len] = '\0';
+        } else {
+            out[0] = '\0';
+        }
+    } else {
+        out[0] = '\0';
+    }
+}
+
 // ── Route incoming messages ──────────────────────────────────
 void route_message(const char *msg) {
     char type[64];
@@ -134,83 +156,84 @@ void route_message(const char *msg) {
 
     if (strcmp(type, "request") == 0) {
         save_to_file(REQUESTS_FILE, msg);
-        char url[256], method[16];
-        json_get_str(msg, "url", url, sizeof(url));
+        char url[256], method[16], flags[256];
+        json_get_str(msg, "url",    url,    sizeof(url));
         json_get_str(msg, "method", method, sizeof(method));
-        char line[400];
-        snprintf(line, sizeof(line), ">> %s %s", method, url);
-        broadcast_to_cli(line); write_log(line);
+        extract_flags(msg, flags, sizeof(flags));
+        char line[600];
+        snprintf(line, sizeof(line), "🌐 %s %s  %s", method, url, flags);
+        broadcast_to_cli(line);
+        write_log(line);
     }
     else if (strcmp(type, "response") == 0) {
         save_to_file(RESPONSES_FILE, msg);
         char url[256], status[8];
-        json_get_str(msg, "url", url, sizeof(url));
+        json_get_str(msg, "url",    url,    sizeof(url));
         json_get_str(msg, "status", status, sizeof(status));
         char line[400];
-        snprintf(line, sizeof(line), "<< %s %s", status, url);
-        broadcast_to_cli(line); write_log(line);
+        snprintf(line, sizeof(line), "📥 %s %s", status, url);
+        broadcast_to_cli(line);
+        write_log(line);
     }
     else if (strcmp(type, "response_body") == 0) {
         save_to_file(BODIES_FILE, msg);
         char url[256]; json_get_str(msg, "url", url, sizeof(url));
-        char line[400]; snprintf(line, sizeof(line), "[BODY] %s", url);
+        char line[400]; snprintf(line, sizeof(line), "📦 BODY %s", url);
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "auth_cookie") == 0) {
         save_to_file(AUTH_FILE, msg);
         char name[64], domain[128];
-        json_get_str(msg, "name", name, sizeof(name));
+        json_get_str(msg, "name",   name,   sizeof(name));
         json_get_str(msg, "domain", domain, sizeof(domain));
-        char line[300]; snprintf(line, sizeof(line), "[AUTH COOKIE] %s @ %s", name, domain);
+        char line[300]; snprintf(line, sizeof(line), "🔑 AUTH COOKIE %s @ %s", name, domain);
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "cookies") == 0) {
         save_to_file(COOKIES_FILE, msg);
-        broadcast_to_cli("[COOKIES SAVED] " COOKIES_FILE);
+        broadcast_to_cli("🍪 COOKIES SAVED → " COOKIES_FILE);
     }
     else if (strcmp(type, "cookies_changed") == 0) {
         save_to_file(COOKIES_FILE, msg);
     }
     else if (strcmp(type, "websocket") == 0) {
         save_to_file(WS_FILE, msg);
-        broadcast_to_cli("[WS] WebSocket frame saved");
+        broadcast_to_cli("🔌 WEBSOCKET frame saved");
     }
     else if (strcmp(type, "dommap") == 0) {
         save_to_file(DOMMAP_FILE, msg);
-        char dom[128], url[256];
-        json_get_str(msg, "domain", dom, sizeof(dom));
-        json_get_str(msg, "url", url, sizeof(url));
-        char line[400]; snprintf(line, sizeof(line), "[DOM MAP] %s -> %s", dom, url);
+        char dom[128]; json_get_str(msg, "domain", dom, sizeof(dom));
+        char url[256]; json_get_str(msg, "url",    url, sizeof(url));
+        char line[400]; snprintf(line, sizeof(line), "🗺️  DOM MAP %s → %s", dom, url);
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "storage") == 0) {
         save_to_file(STORAGE_FILE, msg);
-        broadcast_to_cli("[STORAGE] Saved to storage.jsonl");
+        broadcast_to_cli("💾 STORAGE SAVED → storage.jsonl");
     }
     else if (strcmp(type, "fingerprint") == 0) {
         save_to_file(FINGERPRINT_FILE, msg);
-        char dom[128], line[300];
-        json_get_str(msg, "domain", dom, sizeof(dom));
-        snprintf(line, sizeof(line), "[FINGERPRINT] captured @ %s", dom);
+        char dom[128]; json_get_str(msg, "domain", dom, sizeof(dom));
+        char line[300]; snprintf(line, sizeof(line), "🖥️  FINGERPRINT captured @ %s", dom);
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "html") == 0) {
         char path[256];
         snprintf(path, sizeof(path), DATA_DIR "\\html_%ld.json", (long)time(NULL));
         save_to_file(path, msg);
-        char line[300]; snprintf(line, sizeof(line), "[HTML] Saved -> %s", path);
+        char line[300]; snprintf(line, sizeof(line), "📄 HTML SAVED → %s", path);
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "screenshot") == 0) {
         char path[256];
         snprintf(path, sizeof(path), DATA_DIR "\\screenshot_%ld.json", (long)time(NULL));
         save_to_file(path, msg);
-        char line[300]; snprintf(line, sizeof(line), "[SCREENSHOT] Saved -> %s", path);
+        char line[300]; snprintf(line, sizeof(line), "📷 SCREENSHOT SAVED → %s", path);
         broadcast_to_cli(line); write_log(line);
     }
     else if (strcmp(type, "debugger_status") == 0) {
         char status[32]; json_get_str(msg, "status", status, sizeof(status));
-        char line[128]; snprintf(line, sizeof(line), "[DEBUGGER] %s", status);
+        char line[128]; snprintf(line, sizeof(line), "🔬 DEBUGGER %s", status);
         broadcast_to_cli(line); write_log(line);
     }
     else {
@@ -228,7 +251,7 @@ void handle_browser_message(const char *msg) {
     }
     if (strstr(msg, "\"command\":\"register\"")) {
         send_message("{\"status\":\"registered\",\"browser\":\"brave\"}");
-        broadcast_to_cli("[OK] Browser registered");
+        broadcast_to_cli("✅ Browser registered");
         return;
     }
     route_message(msg);
@@ -243,15 +266,18 @@ unsigned __stdcall cli_client_thread(void *arg) {
 
     const char *banner =
         "\r\n=== Scraper CLI ===\r\n"
-        "  nav <url>   - Open + track all requests\r\n"
-        "  track       - Track active tab\r\n"
-        "  untrack     - Stop tracking\r\n"
-        "  cookies     - Dump cookies\r\n"
-        "  storage     - Dump localStorage/sessionStorage\r\n"
-        "  html        - Get page HTML\r\n"
-        "  screenshot  - Capture screenshot\r\n"
-        "  files       - Show data files\r\n"
-        "  quit        - Exit\r\n> ";
+        "  nav <url>       - Open + track all requests\r\n"
+        "  navigate <url>  - Same as nav\r\n"
+        "  track           - Track active tab\r\n"
+        "  untrack         - Stop tracking\r\n"
+        "  cookies         - Dump cookies\r\n"
+        "  storage         - Dump localStorage/sessionStorage\r\n"
+        "  html            - Get page HTML\r\n"
+        "  screenshot      - Capture screenshot\r\n"
+        "  fingerprint     - Capture browser fingerprint\r\n"
+        "  dommap          - Map DOM\r\n"
+        "  files           - Show data files\r\n"
+        "  quit            - Exit\r\n> ";
 
     DWORD written;
     WriteFile(pipe, banner, (DWORD)strlen(banner), &written, NULL);
@@ -265,47 +291,86 @@ unsigned __stdcall cli_client_thread(void *arg) {
             line[pos] = '\0'; pos = 0;
             char cmd[600] = {0}, reply[512] = {0};
 
+            // "nav <url>" OR "navigate <url>" — both open a new tab
             if (strncmp(line, "nav ", 4) == 0) {
                 snprintf(cmd, sizeof(cmd), "{\"command\":\"navigate\",\"url\":\"%s\"}", line + 4);
                 send_message(cmd);
+                char logbuf[300]; snprintf(logbuf, sizeof(logbuf), "NAV: %s", line + 4);
+                write_log(logbuf);
                 snprintf(reply, sizeof(reply), "Navigating to %s\r\n> ", line + 4);
+
+            } else if (strncmp(line, "navigate ", 9) == 0) {
+                snprintf(cmd, sizeof(cmd), "{\"command\":\"navigate\",\"url\":\"%s\"}", line + 9);
+                send_message(cmd);
+                char logbuf[300]; snprintf(logbuf, sizeof(logbuf), "NAVIGATE: %s", line + 9);
+                write_log(logbuf);
+                snprintf(reply, sizeof(reply), "Navigating to %s\r\n> ", line + 9);
+
             } else if (strcmp(line, "track") == 0) {
                 send_message("{\"command\":\"track\"}");
+                write_log("CMD: track");
                 snprintf(reply, sizeof(reply), "Tracking active tab\r\n> ");
+
             } else if (strcmp(line, "untrack") == 0) {
                 send_message("{\"command\":\"untrack\"}");
+                write_log("CMD: untrack");
                 snprintf(reply, sizeof(reply), "Stopped tracking\r\n> ");
+
             } else if (strcmp(line, "cookies") == 0) {
-                send_message("{\"command\":\"get_cookies\",\"url\":\"current\"}");
+                send_message("{\"command\":\"get_cookies\"}");
+                write_log("CMD: get_cookies");
                 snprintf(reply, sizeof(reply), "Fetching cookies...\r\n> ");
+
             } else if (strcmp(line, "storage") == 0) {
                 send_message("{\"command\":\"get_storage\"}");
+                write_log("CMD: get_storage");
                 snprintf(reply, sizeof(reply), "Fetching storage...\r\n> ");
+
             } else if (strcmp(line, "html") == 0) {
                 send_message("{\"command\":\"get_html\"}");
+                write_log("CMD: get_html");
                 snprintf(reply, sizeof(reply), "Fetching HTML...\r\n> ");
+
+            } else if (strcmp(line, "fingerprint") == 0) {
+                send_message("{\"command\":\"fingerprint\"}");
+                write_log("CMD: fingerprint");
+                snprintf(reply, sizeof(reply), "Capturing fingerprint...\r\n> ");
+
+            } else if (strcmp(line, "dommap") == 0) {
+                send_message("{\"command\":\"dommap\"}");
+                write_log("CMD: dommap");
+                snprintf(reply, sizeof(reply), "Mapping DOM...\r\n> ");
+
             } else if (strcmp(line, "screenshot") == 0) {
                 send_message("{\"command\":\"screenshot\"}");
+                write_log("CMD: screenshot");
                 snprintf(reply, sizeof(reply), "Taking screenshot...\r\n> ");
+
             } else if (strcmp(line, "files") == 0) {
-                char out[512];
+                char out[1024];
                 snprintf(out, sizeof(out),
-                    "Data in .\\data\\\r\n"
-                    "  requests.jsonl   - Flagged requests\r\n"
-                    "  responses.jsonl  - Flagged responses\r\n"
-                    "  bodies.jsonl     - API response bodies\r\n"
-                    "  auth.jsonl       - Auth cookies + localStorage\r\n"
-                    "  cookies.jsonl    - All cookies\r\n"
-                    "  websockets.jsonl - WebSocket frames\r\n"
-                    "  html_*.json      - Saved HTML\r\n> ");
+                    "Data in %s:\\\r\n"
+                    "  requests.jsonl     - Flagged requests\r\n"
+                    "  responses.jsonl    - Flagged responses\r\n"
+                    "  bodies.jsonl       - API response bodies\r\n"
+                    "  auth.jsonl         - Auth cookies\r\n"
+                    "  cookies.jsonl      - All cookies\r\n"
+                    "  websockets.jsonl   - WebSocket frames\r\n"
+                    "  fingerprints.jsonl - Browser fingerprints\r\n"
+                    "  html_*.json        - Saved HTML\r\n> ", DATA_DIR);
                 WriteFile(pipe, out, (DWORD)strlen(out), &written, NULL);
                 continue;
+
             } else if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0) {
                 WriteFile(pipe, "Bye\r\n", 5, &written, NULL);
                 break;
+
             } else {
-                snprintf(reply, sizeof(reply), "Unknown command\r\n> ");
+                char logbuf[300]; snprintf(logbuf, sizeof(logbuf), "UNKNOWN CMD: %s", line);
+                write_log(logbuf);
+                snprintf(reply, sizeof(reply), "Unknown command: %s\r\n> ", line);
             }
+
             if (strlen(reply)) WriteFile(pipe, reply, (DWORD)strlen(reply), &written, NULL);
         } else {
             if (pos < (int)sizeof(line) - 1) line[pos++] = c;
@@ -374,11 +439,25 @@ int main(void) {
     freopen(NULL, "rb", stdin);
     freopen(NULL, "wb", stdout);
 
+    // Set console to UTF-8 mode for emoji support (Windows 10+)
+    SetConsoleOutputCP(CP_UTF8);
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConsole != INVALID_HANDLE_VALUE) {
+        DWORD mode = 0;
+        if (GetConsoleMode(hConsole, &mode)) {
+            mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hConsole, mode);
+        }
+    }
+
     FILE *f = fopen(LOG_FILE, "w");
-    if (f) { fprintf(f, "=== SCRAPY HOST (Windows) ===\nPID: %d\n", (int)GetCurrentProcessId()); fclose(f); }
+    if (f) { 
+        fprintf(f, "=== SCRAPER HOST (Windows) ===\nPID: %d\n", (int)GetCurrentProcessId()); 
+        fclose(f); 
+    }
 
     write_log("Starting");
-    fprintf(stderr, "[SCRAPY] Host PID %d started -- run scraper_cli.exe to connect\n",
+    fprintf(stderr, "🟢 Scraper host PID %d — run scraper_cli.exe to connect\n",
             (int)GetCurrentProcessId());
 
     // Start named pipe server in background thread

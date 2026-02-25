@@ -1,0 +1,92 @@
+/*
+ * SCRAPPER by BertUI — Dashboard Font Size Patch
+ * Apply this to your globals.css or index.css
+ * Bumps all tiny text from 10-11px range up to readable 12-14px
+ */
+
+/* ─── Base / Body ──────────────────────────────────────────────────────── */
+body, html, #root {
+  font-size: 13px !important; /* was 11px */
+}
+
+/* ─── General Text ─────────────────────────────────────────────────────── */
+p, span, div, td, th, li {
+  font-size: 13px;
+}
+
+/* ─── Small Labels (tabs, badges, chips) ───────────────────────────────── */
+.text-xs,
+[class*="text-xs"] {
+  font-size: 12px !important; /* was 10px (0.625rem) */
+}
+
+.text-sm,
+[class*="text-sm"] {
+  font-size: 13px !important; /* was 11px (0.75rem) */
+}
+
+/* ─── Table Cells ──────────────────────────────────────────────────────── */
+table, td, th, .table-cell {
+  font-size: 13px !important;
+}
+
+/* ─── Code Blocks ──────────────────────────────────────────────────────── */
+code, pre, kbd, .mono, [class*="font-mono"] {
+  font-size: 12px !important; /* was 10px */
+}
+
+/* ─── Tab Bar Labels ───────────────────────────────────────────────────── */
+nav a, nav button, [role="tab"] {
+  font-size: 13px !important;
+}
+
+/* ─── Sidebar Items ────────────────────────────────────────────────────── */
+.sidebar *, aside *, [class*="sidebar-"] {
+  font-size: 13px;
+}
+
+/* ─── Log / Live Feed Lines ────────────────────────────────────────────── */
+.log-line, .event-line, .request-row, [class*="log-"],
+[class*="event-"], [class*="request-"] {
+  font-size: 12px !important;
+}
+
+/* ─── Headings (keep proportional) ────────────────────────────────────── */
+h1 { font-size: 20px; }
+h2 { font-size: 17px; }
+h3 { font-size: 15px; }
+h4 { font-size: 14px; }
+h5, h6 { font-size: 13px; }
+
+/* ─── Buttons ──────────────────────────────────────────────────────────── */
+button, [role="button"], .btn {
+  font-size: 13px !important;
+}
+
+/* ─── Input Fields ─────────────────────────────────────────────────────── */
+input, select, textarea {
+  font-size: 13px !important;
+}
+
+/* ─── Tooltips / Badges ────────────────────────────────────────────────── */
+.tooltip, [class*="tooltip"], .badge, [class*="badge"] {
+  font-size: 12px !important;
+}
+
+/* ─── Status / Timestamp Labels ────────────────────────────────────────── */
+.timestamp, [class*="timestamp"], .status-label, [class*="status-"] {
+  font-size: 12px !important;
+}
+
+/*
+ * HOW TO USE
+ * ──────────────────────────────────────────────────────────────────────────
+ * Option A — Import at top of your globals.css:
+ *   @import './font-patch.css';
+ *
+ * Option B — Paste directly into:
+ *   ui/scrapperui/src/index.css   (or globals.css, App.css)
+ *
+ * Option C — Import in main.tsx / main.jsx:
+ *   import './font-patch.css';
+ */

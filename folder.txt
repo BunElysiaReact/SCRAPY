@@ -1,0 +1,170 @@
+PeaseErnest@ernestpease:~/scraper/c_core/native_host
+$ ls
+debug_host    debug_host.exe    scraper_cli    scraper_cli.exe
+debug_host.c  debug_host_win.c  scraper_cli.c  scraper_cli_win.c
+PeaseErnest@ernestpease:~/scraper/c_core/native_host
+$ cd ../../
+PeaseErnest@ernestpease:~/scraper
+$ cd rust_finder
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ cd src
+PeaseErnest@ernestpease:~/scraper/rust_finder/src
+$ ls
+main.rs
+PeaseErnest@ernestpease:~/scraper/rust_finder/src
+$ cd ../
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ ls
+Cargo.toml  src
+
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ ls
+Cargo.lock  Cargo.toml  src  target
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ cd target
+PeaseErnest@ernestpease:~/scraper/rust_finder/target
+$ ls
+CACHEDIR.TAG  release  x86_64-pc-windows-gnu
+PeaseErnest@ernestpease:~/scraper/rust_finder/target
+$ cd x86*
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu
+$ ls
+CACHEDIR.TAG  release
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu
+$ cd release 
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu/release
+$ ls
+build  deps  examples  incremental  rust_finder.d  rust_finder.exe
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu/release
+$ 
+
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ ls
+Cargo.lock  Cargo.toml  src  target
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ cd target
+PeaseErnest@ernestpease:~/scraper/rust_finder/target
+$ ls
+CACHEDIR.TAG  release  x86_64-pc-windows-gnu
+PeaseErnest@ernestpease:~/scraper/rust_finder/target
+$ cd x86*
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu
+$ ls
+CACHEDIR.TAG  release
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu
+$ cd release 
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu/release
+$ ls
+build  deps  examples  incremental  rust_finder.d  rust_finder.exe
+PeaseErnest@ernestpease:~/scraper/rust_finder/target/x86_64-pc-windows-gnu/release
+$ cd ../../../
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ #!/bin/bash
+echo "🔨 Building rust_finder for all platforms..."
+
+# Linux (native)
+echo "📦 Building for Linux..."
+cargo build --release
+echo "   ✅ Linux binary: target/release/rust_finder"
+
+# Windows (cross-compile)
+echo "📦 Building for Windows..."
+rustup target add x86_64-pc-windows-gnu 2>/dev/null
+cargo build --release --target x86_64-pc-windows-gnu
+echo "   ✅ Windows binary: target/x86_64-pc-windows-gnu/release/rust_finder.exe"
+
+echo ""
+echo "🎉 Done! Binaries are ready:"
+ls -la target/release/rust_finder 2>/dev/null || echo "   ❌ Linux build failed"
+ls -la target/x86_64-pc-windows-gnu/release/rust_finder.exe 2>/dev/null || echo "   ❌ Windows build failed" 
+🔨 Building rust_finder for all platforms...
+📦 Building for Linux...
+   Compiling rust_finder v0.1.0 (/home/PeaseErnest/scraper/rust_finder)
+    Finished `release` profile [optimized] target(s) in 1.84s
+   ✅ Linux binary: target/release/rust_finder
+📦 Building for Windows...
+   Compiling rust_finder v0.1.0 (/home/PeaseErnest/scraper/rust_finder)
+    Finished `release` profile [optimized] target(s) in 1.76s
+   ✅ Windows binary: target/x86_64-pc-windows-gnu/release/rust_finder.exe
+
+🎉 Done! Binaries are ready:
+-rwxr-xr-x 2 PeaseErnest PeaseErnest 1733696 Feb 25 11:13 target/release/rust_finder
+-rwxr-xr-x 2 PeaseErnest PeaseErnest 2462361 Feb 25 11:13 target/x86_64-pc-windows-gnu/release/rust_finder.exe
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ # Test with a simple selector
+./target/release/rust_finder --selector "title" --html "<html><title>Test</title></html>" 
+[{"tag":"title","text":"Test","html":"<title>Test</title>","attrs":[]}]
+PeaseErnest@ernestpease:~/scraper/rust_finder
+$ 
+
+
+
+# On Windows, they would:
+# 1. Install Python
+# 2. Install the one dependency:
+pip install pywin32
+
+# 3. Run the Windows version:
+python scraper/windows/api.py
+
+for windows the api.py 
+
+PeaseErnest@ernestpease:~/scraper/windows
+$ tree 
+.
+├── c_core
+│   └── native_host
+│       ├── debug_host.exe
+│       └── scraper_cli.exe
+├── python_api
+│   ├── api.py
+│   └── dashboard.html
+├── rust_finder
+│   └── rust_finder.exe
+└── ui
+    └── scrapperui
+        ├── bertui.config.js
+        ├── bun.lock
+        ├── dist
+        │   ├── assets
+        │   │   ├── chunks
+        │   │   │   ├── main-r2zw8sx5.js
+        │   │   │   └── main-r2zw8sx5.js.map
+        │   │   ├── main-bgpwbgkq.js
+        │   │   ├── main-bgpwbgkq.js.map
+        │   │   ├── router-mck46bw0.js
+        │   │   └── router-mck46bw0.js.map
+        │   ├── favicon.svg
+        │   ├── index.html
+        │   ├── robots.txt
+        │   ├── sitemap.xml
+        │   └── styles
+        │       └── bertui.min.css
+        ├── package.json
+        ├── public
+        │   └── favicon.svg
+        ├── README.md
+        ├── src
+        │   ├── main.jsx
+        │   ├── pages
+        │   │   └── index.jsx
+        │   └── styles
+        │       └── home.css
+        └── vercel.json
+
+15 directories, 25 files
+PeaseErnest@ernestpease:~/scraper/windows
+$ 
+
+for windows 
+and also replace 
+{
+  "name": "com.scraper.core",
+  "description": "Scraper Core Native Host",
+  "path": "C:\\Users\\YOUR_USERNAME\\scraper\\windows\\c_core\\native_host\\debug_host.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://YOUR_EXTENSION_ID_HERE/"
+  ]
+}
+with their name 

@@ -8,6 +8,19 @@ use serde_json::Value;
 use std::env;
 use std::fs;
 
+// Platform-specific path handling
+#[cfg(target_os = "windows")]
+fn normalize_path(path: &str) -> String {
+    // Convert forward slashes to backslashes on Windows
+    path.replace('/', "\\")
+}
+
+#[cfg(not(target_os = "windows"))]
+fn normalize_path(path: &str) -> String {
+    // Keep as-is on Linux/Mac
+    path.to_string()
+}
+
 #[derive(Serialize)]
 struct Match {
     tag:        String,
@@ -27,10 +40,31 @@ fn main() {
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
-            "--selector" => { i += 1; selector_str = args[i].clone(); }
-            "--file"     => { i += 1; file_path    = args[i].clone(); }
-            "--limit"    => { i += 1; limit = args[i].parse().unwrap_or(100); }
-            "--html"     => { i += 1; raw_html     = args[i].clone(); }
+            "--selector" => { 
+                i += 1; 
+                if i < args.len() {
+                    selector_str = args[i].clone();
+                }
+            }
+            "--file"     => { 
+                i += 1; 
+                if i < args.len() {
+                    // Normalize path for current platform
+                    file_path = normalize_path(&args[i]);
+                }
+            }
+            "--limit"    => { 
+                i += 1; 
+                if i < args.len() {
+                    limit = args[i].parse().unwrap_or(100);
+                }
+            }
+            "--html"     => { 
+                i += 1; 
+                if i < args.len() {
+                    raw_html = args[i].clone();
+                }
+            }
             _ => {}
         }
         i += 1;

@@ -1,9 +1,10 @@
 {
   "name": "com.scraper.core",
   "description": "Scraper Core Native Host",
-  "path": "C:\\Users\\YOUR_USERNAME\\scraper\\windows\\c_core\\native_host\\debug_host.exe",
+  "path": "/home/YOUR_USERNAME/scraper/c_core/native_host/native_host",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://YOUR_EXTENSION_ID_HERE/"
   ]
 }
+
