@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════════════
-#   SCRAPY by BertUI — One-Line Installer for Windows
+#   SCRAPPER by BertUI — One-Line Installer for Windows
 #   Run in PowerShell (Run as Administrator recommended):
 #
 #   irm https://raw.githubusercontent.com/BunElysiaReact/SCRAPY/main/install.ps1 | iex
@@ -8,27 +8,27 @@
 
 $ErrorActionPreference = "Stop"
 
-$REPO     = "BunElysiaReact/SCRAPY"
-$SCRAPPER = "$env:USERPROFILE\.scrapy"
-$BIN      = "$SCRAPPER\bin"
-$DATA     = "$SCRAPPER\data"
-$LOGS     = "$SCRAPPER\logs"
-$API      = "$SCRAPPER\python_api"
+$REPO      = "BunElysiaReact/SCRAPY"
+$SCRAPPER  = "$env:USERPROFILE\.scrapper"
+$BIN       = "$SCRAPPER\bin"
+$DATA      = "$SCRAPPER\data"
+$LOGS      = "$SCRAPPER\logs"
+$API       = "$SCRAPPER\python_api"
 $EXT_BRAVE = "$SCRAPPER\extension\brave"
 $EXT_FF    = "$SCRAPPER\extension\firefox"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
-function ok($msg)         { Write-Host "  [+] $msg" -ForegroundColor Green }
-function info($msg)       { Write-Host "  [>] $msg" -ForegroundColor Cyan }
-function warn($msg)       { Write-Host "  [!] $msg" -ForegroundColor Yellow }
-function fail($msg)       { Write-Host "  [X] $msg" -ForegroundColor Red; exit 1 }
-function step($n, $msg)   { Write-Host "`n  [$n] $msg" -ForegroundColor White }
+function ok($msg)       { Write-Host "  [+] $msg" -ForegroundColor Green }
+function info($msg)     { Write-Host "  [>] $msg" -ForegroundColor Cyan }
+function warn($msg)     { Write-Host "  [!] $msg" -ForegroundColor Yellow }
+function fail($msg)     { Write-Host "  [X] $msg" -ForegroundColor Red; exit 1 }
+function step($n, $msg) { Write-Host "`n  [$n] $msg" -ForegroundColor White }
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 Clear-Host
 Write-Host ""
 Write-Host "  +==================================================+" -ForegroundColor Green
-Write-Host "  |   [*]  S C R A P Y  by BertUI                  |" -ForegroundColor Green
+Write-Host "  |   [*]  S C R A P P E R  by BertUI              |" -ForegroundColor Green
 Write-Host "  |   Windows Installer                             |" -ForegroundColor Green
 Write-Host "  |   Go scrape it - with ease.                     |" -ForegroundColor Green
 Write-Host "  +==================================================+" -ForegroundColor Green
@@ -90,7 +90,7 @@ function Write-Manifest($dir, $extId = "YOUR_EXTENSION_ID_HERE") {
     @"
 {
   "name": "com.scraper.core",
-  "description": "SCRAPY Native Host - BertUI Framework",
+  "description": "SCRAPPER Native Host - BertUI Framework",
   "path": "$hostPath",
   "type": "stdio",
   "allowed_origins": [
@@ -110,7 +110,7 @@ function Write-Firefox-Manifest {
     $json = @"
 {
   "name": "com.scraper.core",
-  "description": "SCRAPY Native Host - BertUI Framework",
+  "description": "SCRAPPER Native Host - BertUI Framework",
   "path": "$hostPath",
   "type": "stdio",
   "allowed_extensions": ["scrapper@bertui.dev"]
@@ -126,17 +126,17 @@ function Write-Firefox-Manifest {
 # ════════════════════════════════════════════════════════════════════════════════
 
 # ── Step 1: Create directories ────────────────────────────────────────────────
-step "1/5" "Creating SCRAPY directories"
+step "1/5" "Creating SCRAPPER directories"
 foreach ($d in @($SCRAPPER, $BIN, $DATA, $LOGS, $API, $EXT_BRAVE, $EXT_FF)) {
     if (!(Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
 }
-ok "SCRAPY home: $SCRAPPER"
+ok "SCRAPPER home: $SCRAPPER"
 
 # ── Step 2: Download & extract tarball ───────────────────────────────────────
-step "2/5" "Downloading SCRAPY"
+step "2/5" "Downloading SCRAPPER"
 
 $TARBALL_URL = "https://github.com/$REPO/raw/main/windows.tar.gz"
-$TARBALL     = "$env:TEMP\scrapy-windows.tar.gz"
+$TARBALL     = "$env:TEMP\scrapper-windows.tar.gz"
 
 info "Downloading windows bundle..."
 $got = Download $TARBALL_URL $TARBALL
@@ -144,7 +144,6 @@ if (!$got) { fail "Failed to download windows.tar.gz from repo." }
 ok "Downloaded"
 
 info "Extracting..."
-# tar is available on Windows 10 1803+ natively
 tar -xzf $TARBALL -C $SCRAPPER --strip-components=1
 ok "Extracted to $SCRAPPER"
 
@@ -195,28 +194,28 @@ step "4/5" "Creating launcher scripts"
 
 @"
 @echo off
-title SCRAPY by BertUI
+title SCRAPPER by BertUI
 echo.
-echo   [*] Starting SCRAPY...
-echo   [>] API + Dashboard: http://localhost:8080
+echo   [*] Starting SCRAPPER...
+echo   [>] API + built-in UI: http://localhost:8080
 echo   [>] Press Ctrl+C to stop.
 echo.
 python "$API\api.py"
-"@ | Out-File -FilePath "$BIN\scrapy-start.bat" -Encoding ASCII
-ok "scrapy-start.bat"
+"@ | Out-File -FilePath "$BIN\scrapper-start.bat" -Encoding ASCII
+ok "scrapper-start.bat"
 
 @"
 @echo off
-echo Stopping SCRAPY...
-taskkill /F /IM python.exe /FI "WINDOWTITLE eq SCRAPY*" 2>nul
+echo Stopping SCRAPPER...
+taskkill /F /IM python.exe /FI "WINDOWTITLE eq SCRAPPER*" 2>nul
 echo Done.
-"@ | Out-File -FilePath "$BIN\scrapy-stop.bat" -Encoding ASCII
-ok "scrapy-stop.bat"
+"@ | Out-File -FilePath "$BIN\scrapper-stop.bat" -Encoding ASCII
+ok "scrapper-stop.bat"
 
 @"
 param([string]`$ExtId)
 if (-not `$ExtId) {
-    Write-Host "Usage: scrapy-register-ext.ps1 YOUR_EXTENSION_ID" -ForegroundColor Yellow
+    Write-Host "Usage: scrapper-register-ext.ps1 YOUR_EXTENSION_ID" -ForegroundColor Yellow
     Write-Host "Find your ID at brave://extensions or chrome://extensions"
     exit 1
 }
@@ -229,7 +228,7 @@ if (-not `$ExtId) {
 `$json = @"
 {
   "name": "com.scraper.core",
-  "description": "SCRAPY Native Host - BertUI Framework",
+  "description": "SCRAPPER Native Host - BertUI Framework",
   "path": "`$hostPath",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://`$ExtId/"]
@@ -243,13 +242,13 @@ foreach (`$dir in `$dirs) {
 }
 Write-Host ""
 Write-Host "  [+] Extension ID registered. Reload your extension." -ForegroundColor Green
-"@ | Out-File -FilePath "$BIN\scrapy-register-ext.ps1" -Encoding UTF8
-ok "scrapy-register-ext.ps1"
+"@ | Out-File -FilePath "$BIN\scrapper-register-ext.ps1" -Encoding UTF8
+ok "scrapper-register-ext.ps1"
 
 # ── Step 5: PATH ──────────────────────────────────────────────────────────────
 step "5/5" "Updating PATH"
 $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($currentPath -notlike "*\.scrapy\bin*") {
+if ($currentPath -notlike "*\.scrapper\bin*") {
     [Environment]::SetEnvironmentVariable("Path", "$currentPath;$BIN", "User")
     ok "Added $BIN to user PATH"
 }
@@ -259,13 +258,13 @@ if (!(Get-Command python -ErrorAction SilentlyContinue)) {
     warn "Python 3 not found! Download from https://python.org"
 }
 if (!(Get-Command bun -ErrorAction SilentlyContinue) -and !(Get-Command node -ErrorAction SilentlyContinue)) {
-    warn "Bun or Node.js not found. Dashboard UI requires one. https://bun.sh"
+    warn "Bun or Node.js not found. Bun dashboard requires one. https://bun.sh"
 }
 
 # ── Final output ──────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "  +==================================================+" -ForegroundColor Green
-Write-Host "  |  SCRAPY installed to $SCRAPPER" -ForegroundColor Green
+Write-Host "  |  SCRAPPER installed to $SCRAPPER" -ForegroundColor Green
 Write-Host "  +==================================================+" -ForegroundColor Green
 Write-Host ""
 Write-Host "  HOW TO COMPLETE SETUP:" -ForegroundColor White
@@ -276,10 +275,10 @@ Write-Host "           → 'Load unpacked' → select:"
 Write-Host "           $EXT_BRAVE" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  Step 2.  Copy your extension ID, then run:" -ForegroundColor Cyan
-Write-Host "           scrapy-register-ext.ps1 YOUR_EXTENSION_ID" -ForegroundColor White
+Write-Host "           scrapper-register-ext.ps1 YOUR_EXTENSION_ID" -ForegroundColor White
 Write-Host ""
-Write-Host "  Step 3.  Start SCRAPY:" -ForegroundColor Cyan
-Write-Host "           scrapy-start.bat" -ForegroundColor White
+Write-Host "  Step 3.  Start SCRAPPER:" -ForegroundColor Cyan
+Write-Host "           scrapper-start.bat" -ForegroundColor White
 Write-Host ""
 Write-Host "  Step 4.  Open dashboard:" -ForegroundColor Cyan
 Write-Host "           http://localhost:8080" -ForegroundColor White
