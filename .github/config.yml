@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://scrapper-docs.pages.dev/
+    about: Check the docs first
+  - name: Discussions
+    url: https://github.com/BunElysiaReact/SCRAPY/discussions
+    about: General questions go here
