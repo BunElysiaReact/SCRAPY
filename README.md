@@ -6,6 +6,8 @@
 > GitHub: [BunElysiaReact/SCRAPY](https://github.com/BunElysiaReact/SCRAPY)  
 > *No domain. No cloud. All local. All yours.*
 
+![SCRAPPER Dashboard](./finally.png)
+
 ---
 
 ## 📋 Table of Contents
@@ -87,6 +89,27 @@ YOUR SCRIPT ──── GET /api/v1/session/all ────► SCRAPPER API (l
 
 ---
 
+## 🎬 See It In Action
+
+### The Dashboard — 258 captured claude.ai requests
+![SCRAPPER Dashboard Responses](./showcase.png)
+
+### The Extension Popup — Live feed, quick capture, real-time stats
+![SCRAPPER Extension](./extension_ui.png)
+
+### The Installer — One command, 5 steps, done
+![SCRAPPER Installer](./installer.png)
+
+### Register Extension ID — One command after loading extension
+![Register Extension](./register_extension_id_.png)
+
+### Real World Example — Talking to Claude.ai from the terminal via SCRAPPER
+![Claude Chat via SCRAPPER](./claudetest.png)
+
+> The script above used SCRAPPER to capture a real claude.ai session, then sent messages directly via the API — zero login code, zero Puppeteer, zero browser automation.
+
+---
+
 ## 📦 What SCRAPPER Captures
 
 ```
@@ -134,7 +157,7 @@ YOUR SCRIPT ──── GET /api/v1/session/all ────► SCRAPPER API (l
 |--------------|---------------|
 | **Brittle Session Lifespan** | Entirely dependent on an active browser session — expires if you log out |
 | **Depends on Internal APIs** | Uses undocumented endpoints that can change without notice |
-| **Requires Setup Infrastructure** | Not standalone — needs debug host + browser extension running simultaneously |
+| **Requires Setup Infrastructure** | Not standalone — needs native host + browser extension running simultaneously |
 | **Account Risk** | Uses your real identity. Aggressive rate-limit hitting can get your real account banned |
 | **Learning Curve** | Must read network traffic to understand correct API payloads |
 | **Single Device Binding** | `device-id` is tied to one captured session — can't easily share across machines |
@@ -169,10 +192,27 @@ Once captured, SCRAPPER serves everything via a simple REST API at `http://local
 curl -fsSL https://raw.githubusercontent.com/BunElysiaReact/SCRAPY/main/install.sh | bash
 ```
 
+### After Install — Complete Setup
+
+```bash
+# Step 1 — Load extension in Brave:
+# brave://extensions → Developer mode ON → Load unpacked
+# → select: ~/.scrapper/extension/brave/
+
+# Step 2 — Register your extension ID
+scrapper-register-ext YOUR_EXTENSION_ID
+
+# Step 3 — Start SCRAPPER
+scrapper-start
+
+# Step 4 — Open dashboard
+# http://localhost:8080
+```
+
 ### Requirements
 
 - **Python 3** (any recent version)
-- **Bun** or **Node.js** (for the dashboard)
+- **Bun** or **Node.js** (for the Bun dashboard — optional)
 - **Brave / Chrome / Firefox** browser
 
 ### Manual Setup
@@ -183,20 +223,16 @@ git clone https://github.com/BunElysiaReact/SCRAPY.git ~/scrapper
 cd ~/scrapper
 
 # Build the C native host
-gcc -O2 -o c_core/native_host/debug_host c_core/native_host/debug_host.c -lpthread
-gcc -O2 -o c_core/native_host/scraper_cli c_core/native_host/scraper_cli.c
+gcc -O2 -o linux/c_core/native_host/debug_host linux/c_core/native_host/debug_host.c -lpthread
 
 # Build the Rust selector engine
-cd rust_finder && cargo build --release && cd ..
+cd linux/rust_finder && cargo build --release && cd ../..
 
 # Start the API server
-cd python_api && python3 api.py
-
-# In another terminal — start the dashboard
-cd ui/scrapperui && bun install && bun run dev
+cd linux/python_api && python3 api.py
 ```
 
-Open **http://localhost:3000** → Dashboard ready.
+Open **http://localhost:8080** → Dashboard ready.
 
 ---
 
@@ -208,41 +244,7 @@ Open **http://localhost:3000** → Dashboard ready.
 irm https://raw.githubusercontent.com/BunElysiaReact/SCRAPY/main/install.ps1 | iex
 ```
 
-### What the installer does on Windows
-
-1. Downloads pre-compiled `debug_host.exe` and `scraper_cli.exe`
-2. Downloads pre-compiled `rust_finder.exe`
-3. Installs the browser extension for Brave/Chrome/Edge
-4. Registers the native messaging manifest in the correct location:
-   - Brave: `%APPDATA%\BraveSoftware\Brave-Browser\NativeMessagingHosts\`
-   - Chrome: `%APPDATA%\Google\Chrome\NativeMessagingHosts\`
-   - Edge: `%APPDATA%\Microsoft\Edge\NativeMessagingHosts\`
-5. Creates `scrapper-start.bat` and `scrapper-stop.bat` in `%USERPROFILE%\.scrapper\bin\`
-
-### Manual Windows Setup
-
-```powershell
-# Requires: Python 3, Bun or Node, mingw64 (for compiling C), Rust (for compiling Rust)
-
-git clone https://github.com/BunElysiaReact/SCRAPY.git $env:USERPROFILE\.scrapper
-cd $env:USERPROFILE\.scrapper
-
-# Compile C host (requires mingw64 or MSVC)
-x86_64-w64-mingw32-gcc -o c_core\native_host\debug_host.exe c_core\native_host\debug_host_win.c -D_WIN32_WINNT=0x0600
-
-# Compile Rust
-cd rust_finder; cargo build --release; cd ..
-
-# Register native messaging (update path and extension ID first)
-# Edit config\com.scraper.core.json then copy to:
-# %APPDATA%\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.scraper.core.json
-
-# Start the API
-python python_api\api.py
-
-# Start the dashboard
-cd ui\scrapperui && bun install && bun run dev
-```
+> ⚠️ Run PowerShell as Administrator for native messaging registration to work correctly.
 
 ### Windows Folder Structure After Install
 
@@ -268,65 +270,52 @@ cd ui\scrapperui && bun install && bun run dev
 
 ## 🧩 Browser Extensions
 
-SCRAPPER has extensions for all major browsers. Load the extension folder **unpacked** in developer mode.
-
 ### Brave & Chrome (Recommended)
-
-> Brave and Chrome share the same Chromium engine. **Use the same extension folder for both.**
 
 1. Open `brave://extensions` or `chrome://extensions`
 2. Enable **Developer mode** (top right)
 3. Click **Load unpacked**
-4. Select: `extension/brave/`
-
-Full features: CDP debugging, DOM mapping, fingerprint capture, stealth injection, live feed, popup UI.
+4. Select: `~/.scrapper/extension/brave/`
+5. Copy the Extension ID
+6. Run: `scrapper-register-ext YOUR_ID`
 
 ### Microsoft Edge
 
-1. Open `edge://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select: `extension/brave/` (same folder — Edge is Chromium-based)
+Same as Brave/Chrome — Edge is Chromium-based, use the `extension/brave/` folder.
 
 ### Firefox
 
-> Firefox uses Manifest V2 and does not support the Chrome Debugger Protocol.  
-> The Firefox extension captures cookies, network headers, and localStorage — but **not** CDP-level request bodies.
+1. Open `about:debugging` → **This Firefox**
+2. Click **Load Temporary Add-on...**
+3. Select: `~/.scrapper/extension/firefox/manifest.json`
 
-1. Open `about:debugging`
-2. Click **This Firefox**
-3. Click **Load Temporary Add-on...**
-4. Select: `extension/firefox/manifest.json`
-
-For permanent installation, sign the extension at [addons.mozilla.org](https://addons.mozilla.org/developers/).
-
-**Firefox captures:**
-- ✅ All cookies (including auth cookies)
-- ✅ Cookie change events
-- ✅ localStorage / sessionStorage (via content script)
-- ✅ Basic network request/response logging
-- ⚠️ No response bodies (Firefox API limitation without CDP)
-- ⚠️ No DOM mapping or fingerprint capture
-
-### After Loading — Register Your Extension ID
-
-After loading the extension, copy its ID from the extensions page, then run:
-
-**Linux/macOS:**
-```bash
-scrapy-register-ext YOUR_EXTENSION_ID_HERE
-```
-
-**Windows:**
-```powershell
-scrapper-register-ext.ps1 YOUR_EXTENSION_ID_HERE
-```
+> ⚠️ Firefox captures cookies, headers, localStorage — but not CDP-level request bodies.
 
 ---
 
 ## 🔧 Using Captured Data in Your Tools
 
-### Python Requests
+### Python + curl_cffi (Recommended)
+
+```python
+from curl_cffi import requests
+
+API = "http://localhost:8080"
+domain = "example.com"
+
+cookies_raw = requests.get(f"{API}/api/v1/session/cookies?domain={domain}").json()
+fp = requests.get(f"{API}/api/v1/fingerprint?domain={domain}").json()
+
+session = requests.Session(impersonate="chrome120")
+for c in cookies_raw:
+    session.cookies.set(c["name"], c["value"], domain=c.get("domain", domain).lstrip("."))
+session.headers.update({"User-Agent": fp.get("userAgent", "")})
+
+response = session.get(f"https://{domain}/api/data")
+print(response.json())
+```
+
+### Python requests
 
 ```python
 import requests
@@ -346,8 +335,8 @@ response = s.get('https://api.example.com/data')
 source <(curl -s http://localhost:8080/api/v1/export/env)
 
 curl -X POST "https://api.example.com/upload" \
-  -H "Authorization: Bearer $SCRAPY_BEARER_TOKEN" \
-  -b "$SCRAPY_COOKIES" \
+  -H "Authorization: Bearer $SCRAPPER_BEARER_TOKEN" \
+  -b "$SCRAPPER_COOKIES" \
   -F "file=@document.pdf"
 ```
 
@@ -385,7 +374,9 @@ await page.goto('https://example.com/dashboard');
 
 ## 📊 Dashboard Overview
 
-Open `http://localhost:3000` (dev) or `http://localhost:8080` (production):
+![SCRAPPER Live Dashboard](./ui_main_page.png)
+
+Open `http://localhost:8080`:
 
 | Tab | What It Does |
 |-----|--------------|
@@ -473,8 +464,6 @@ while True:
 
 ## 🤝 Contributing
 
-### Ways to Contribute
-
 | Area | What's Needed |
 |------|---------------|
 | **Testing** | Try SCRAPPER on different sites, report bugs |
@@ -483,15 +472,7 @@ while True:
 | **Docs** | Write tutorials for specific sites or use cases |
 | **Code** | PRs welcome — especially bug fixes |
 
-### Report Issues
 [Open an issue](https://github.com/BunElysiaReact/SCRAPY/issues)
-
----
-
-## 📬 Get Involved
-
-- **GitHub**: [BunElysiaReact/SCRAPY](https://github.com/BunElysiaReact/SCRAPY)
-- **Issues**: [github.com/BunElysiaReact/SCRAPY/issues](https://github.com/BunElysiaReact/SCRAPY/issues)
 
 ---
 
@@ -510,3 +491,4 @@ while True:
 *🔍 Watching your browser so you don't have to*
 
 **⭐ Star the repo if SCRAPPER helps you — it helps others find it!**
+```
