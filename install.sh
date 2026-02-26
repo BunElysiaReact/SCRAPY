@@ -295,13 +295,17 @@ ok "scrapper-register-ext created"
 SHELL_RC=""
 [[ "$SHELL" == *"zsh"* ]]  && SHELL_RC="$HOME/.zshrc"
 [[ "$SHELL" == *"bash"* ]] && SHELL_RC="$HOME/.bashrc"
+
 if [[ -n "$SHELL_RC" ]] && ! grep -q "\.scrapper/bin" "$SHELL_RC" 2>/dev/null; then
   echo "" >> "$SHELL_RC"
   echo '# SCRAPPER' >> "$SHELL_RC"
   echo 'export PATH="$HOME/.scrapper/bin:$PATH"' >> "$SHELL_RC"
   ok "PATH updated in $SHELL_RC"
 fi
+
+# Force PATH into the current session right now
 export PATH="$HOME/.scrapper/bin:$PATH"
+hash -r 2>/dev/null || true
 
 # ── Final output ──────────────────────────────────────────────────────────────
 echo ""
@@ -327,7 +331,7 @@ echo ""
 echo -e "  ${DIM}API:  http://localhost:8080/api/v1/session/all${RESET}"
 echo -e "  ${DIM}Bulk: http://localhost:8080/api/v1/bulk/all?format=json${RESET}"
 echo ""
+echo -e "  ${YELLOW}⚠${RESET}  New terminal? Run: ${BOLD}source ~/$( basename ${SHELL_RC:-~/.bashrc} )${RESET}"
+echo ""
 echo -e "  ${GREEN}◈ Go scrape it — with ease.${RESET}"
 echo ""
-
-[[ -n "$SHELL_RC" ]] && source "$SHELL_RC" 2>/dev/null || true
